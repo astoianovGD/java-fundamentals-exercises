@@ -1,6 +1,9 @@
 package com.bobocode.se;
 
 import com.bobocode.util.ExerciseNotCompletedException;
+
+import java.awt.*;
+import java.lang.reflect.Field;
 import java.util.Comparator;
 
 /**
@@ -17,9 +20,31 @@ import java.util.Comparator;
  * @author Stanislav Zabramnyi
  */
 public class RandomFieldComparator<T> implements Comparator<T> {
+    private Field field;
+    private Class<T> targetType;
 
     public RandomFieldComparator(Class<T> targetType) {
-        throw new ExerciseNotCompletedException(); // todo: implement this constructor;
+        this.targetType = targetType;
+
+        // We retrieve all declared fields of the class.
+        java.lang.reflect.Field[] allFields = targetType.getDeclaredFields();
+
+        //We filter the fields: we keep only those that are primitives or implement Comparable.
+        java.util.List<Field> comparableFields = java.util.Arrays.stream(allFields)
+                .filter(f -> f.getType().isPrimitive() || Comparable.class.isAssignableFrom(f.getType()))
+                .collect(java.util.stream.Collectors.toList());
+
+        // If there are no suitable fields, throw an exception based on the condition.
+        if (comparableFields.isEmpty()) {
+            throw new IllegalArgumentException("No primitive or Comparable fields found in class " + targetType.getName());
+        }
+
+        // We select a random index and store the field in your variable.
+        int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(comparableFields.size());
+        this.field = comparableFields.get(randomIndex);
+
+        // Making the field accessible (in case it is private)
+        this.field.setAccessible(true);
     }
 
     /**
@@ -33,15 +58,30 @@ public class RandomFieldComparator<T> implements Comparator<T> {
      *         negative int in case of first parameter {@param o1} is less than second one {@param o2}.
      */
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public int compare(T o1, T o2) {
-        throw new ExerciseNotCompletedException(); // todo: implement this method;
+        try {
+            this.field.setAccessible(true);
+
+            Comparable v1 = (Comparable) this.field.get(o1);
+            Comparable v2 = (Comparable) this.field.get(o2);
+
+            if (v1 == null && v2 == null) return 0;
+            if (v1 == null) return 1;
+            if (v2 == null) return -1;
+
+            return v1.compareTo(v2);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to access field " + this.field.getName(), e);
+        }
     }
 
     /**
      * Returns the name of the randomly-chosen comparing field.
      */
     public String getComparingFieldName() {
-        throw new ExerciseNotCompletedException(); // todo: implement this method;
+        // todo: implement this method;
+        return this.field.getName();
     }
 
     /**
@@ -52,6 +92,8 @@ public class RandomFieldComparator<T> implements Comparator<T> {
      */
     @Override
     public String toString() {
-        throw new ExerciseNotCompletedException(); // todo: implement this method;
+        // todo: implement this method;
+        return String.format("Random field comparator of class '%s' is comparing '%s'",
+                targetType.getSimpleName(), getComparingFieldName());
     }
 }
